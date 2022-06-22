@@ -42,22 +42,30 @@ color_palette = function(){
 #' @import tidyverse
 #' @importFrom stats complete.cases
 #' @importFrom methods is
+#' @importFrom tidyr pivot_longer
 #' @importFrom magrittr '%>%'
 #' @importFrom reshape2 melt acast
 #' @return a \code{list} of 3 \code{data.frame}'s representing the variable and category decomposition, and the fitted values.
 #' @examples
-#' run_model(data = mtcars,dv = 'mpg',ivs = c('wt','cyl','disp')) %>% decomping()
+#' run_model(data = mtcars,dv = 'mpg',ivs = c('wt','cyl','disp'),decompose=FALSE) %>% decomping()
 decomping = function(model = NULL,
                      de_normalise = TRUE,
                      raw_data = NULL,
                      categories = NULL,
                      id_var = NULL,
                      verbose = FALSE){
-  # checks ####
+  # checks  ####
 
+  # model =  run_model(data = mtcars,dv = 'mpg',ivs = c('wt','cyl','disp'))
+  # de_normalise = TRUE
+  # raw_data = NULL
+  # categories = NULL
+  # id_var = NULL
+  # verbose = FALSE
+  
   # check verbose
   if(!is.logical(verbose)){
-    cat("\n Warning: verbose provided mus be logical (TRUE or FALSE). Setting to False.")
+    message("Warning: verbose provided mus be logical (TRUE or FALSE). Setting to False.")
     verbose = FALSE
   }
 
@@ -65,13 +73,13 @@ decomping = function(model = NULL,
   # check if model is provided
   if(is.null(model)){
     if(verbose){
-      cat("\n Error: no model provided. Returning NULL.")
+      message("Error: no model provided. Returning NULL.")
     }
     return(NULL)
   }
   if(!is(model,'lm')){
     if(verbose){
-      cat("\n Error: model must be of type 'lm'. Returning NULL.")
+      message("Error: model must be of type 'lm'. Returning NULL.")
     }
     return(NULL)
   }
@@ -82,7 +90,7 @@ decomping = function(model = NULL,
   ivs = names(coef)[-1]
 
   if(!("model_ table" %in% names(model))){
-    model_table = build_model_table(ivs = ivs)
+    model_table = build_model_table(ivs = ivs,trans_df = model$trans_df)
   }
 
 
@@ -106,11 +114,11 @@ decomping = function(model = NULL,
     #check raw_data
     if(!is.data.frame(raw_data)){
       if (verbose) {
-        cat("\n Warning: raw_data must be a data.frame.")
+        message("Warning: raw_data must be a data.frame.")
       }
     }else if(any(complete.cases(raw_data))) {
       if(verbose){
-        cat("\n Warning: NA's found in raw data will be dropped.")
+        message("Warning: NA's found in raw data will be dropped.")
       }
       raw_data = raw_data[complete.cases(raw_data), ]
     }
@@ -119,7 +127,7 @@ decomping = function(model = NULL,
 
   if(!is.logical(de_normalise)){
     if(verbose){
-      cat("\n Warning: de_normalise provided must be of type logical. Setting de_normalise to FALSE.")
+      message("Warning: de_normalise provided must be of type logical. Setting de_normalise to FALSE.")
     }
     de_normalise = FALSE
   }
@@ -128,7 +136,7 @@ decomping = function(model = NULL,
   if (de_normalise) {
     # if no raw data provided
     if (is.null(raw_data) | !is.data.frame(raw_data)) {
-      if(verbose)cat("\n Warning: you must provide a raw_data data.frame to de normalise the data.")
+      if(verbose)message("Warning: you must provide a raw_data data.frame to de normalise the data.")
     }
 
     # if the raw data is supplied
@@ -146,7 +154,7 @@ decomping = function(model = NULL,
 
       } else{
         # else if(verbose)print warning
-        if(verbose)cat("\n Warning: dependent variable not found in raw_data supplied.")
+        if(verbose)message("Warning: dependent variable not found in raw_data supplied.")
 
       }
     }
@@ -160,8 +168,8 @@ decomping = function(model = NULL,
 
   # generate an id variable if one is not provided
   if (is.null(id_var)) {
-    if(verbose)cat(paste0(
-      "\n Info: no id variable supplied. New id variable generated as 1 to ",
+    if(verbose)message(paste0(
+      "Info: no id variable supplied. New id variable generated as 1 to ",
       nrow(data)
     ))
     id_var = "id"
@@ -170,9 +178,9 @@ decomping = function(model = NULL,
     # if and id_var is provided, check that raw data is provided
     if (is.null(raw_data)) {
       # if raw data not provided if(verbose)print warning and generate id_var_values
-      if(verbose)cat(
+      if(verbose)message(
         paste0(
-          "\n Warning: ID variable provided, but no raw data provided. New id variable generated as 1 to ",
+          "Warning: ID variable provided, but no raw data provided. New id variable generated as 1 to ",
           nrow(data)
         )
       )
@@ -184,9 +192,9 @@ decomping = function(model = NULL,
         id_var_values = raw_data %>% pull(!!sym(id_var))
       } else{
         # if raw data doesnt contain the id_var, if(verbose)print warning and generate id_variable
-        if(verbose)cat(
+        if(verbose)message(
           paste0(
-            "\n Warning: ID variable provided not found in raw data provided. New id variable generated as 1 to ",
+            "Warning: ID variable provided not found in raw data provided. New id variable generated as 1 to ",
             nrow(data)
           )
         )
@@ -201,8 +209,8 @@ decomping = function(model = NULL,
   # if no meta_data is provided
   if (is.null(meta_data)) {
     if(verbose){
-      cat(
-        "\n Info: no normalisation table (meta_data) found in model object. A pool variable ('total') will be generated."
+      message(
+        "Info: no normalisation table (meta_data) found in model object. A pool variable ('total') will be generated."
       )}
 
     pool = tibble("total_pool")
@@ -212,8 +220,8 @@ decomping = function(model = NULL,
 
     # if no raw data provided if(verbose)print a warning and generate a pool variable
     if (is.null(raw_data)) {
-      if(verbose)cat(
-        "\n Warning: no raw_data found to extract pool variable found in model's meta_data. A pool variable ('total') will be generated."
+      if(verbose)message(
+        "Warning: no raw_data found to extract pool variable found in model's meta_data. A pool variable ('total') will be generated."
       )
 
       pool = tibble("total_pool")
@@ -223,15 +231,15 @@ decomping = function(model = NULL,
         pool = raw_data[, pool_variable]
       } else{
         # if not, if(verbose)print warning and geterate pool variable
-        if(verbose)cat(
-          "\n Warning: pool variable from model's meta_data not found in raw_data. A pool variable ('total_pool') will be generated."
+        if(verbose)message(
+          "Warning: pool variable from model's meta_data not found in raw_data. A pool variable ('total_pool') will be generated."
         )
         pool = tibble("total_pool")
       }
     }else{
       # if not, if(verbose)print warning and geterate pool variable
-      if(verbose)cat(
-        "\n Warning: pool variable from model's meta_data not found in raw_data. A pool variable ('total_pool') will be generated."
+      if(verbose)message(
+        "Warning: pool variable from model's meta_data not found in raw_data. A pool variable ('total_pool') will be generated."
       )
       pool = tibble("total_pool")
     }
@@ -242,11 +250,16 @@ decomping = function(model = NULL,
     actual = c(actual),
     residual = model$residuals,
     predicted = model$fitted.values,
-    id = id_var_values,
-    pool = pool %>% pull()
-  ) %>%
-    reshape2::melt(id.vars = c("id", "pool"),factorsAsStrings=FALSE)
-
+    id = id_var_values%>% factor(),
+    pool = pool %>% pull() %>% factor()
+  ) 
+  fitted_values = pivot_longer(
+    data = fitted_values,
+    cols = c('actual','residual','predicted'),
+    values_to = 'value',
+    names_to = "variable") %>% 
+    arrange(variable,id)
+  
   # get the independent variables decomp
   independendent_variables =  data[, 2:ncol(data)]
   if (length(coef) == 1) {
@@ -267,13 +280,19 @@ decomping = function(model = NULL,
   colnames(variable_decomp) = names(coef)
 
   # generate tibble df using the variable decomp, intercept and id variable
+  
+  
   variable_decomp = tibble(
     "(Intercept)" = intercept,
     variable_decomp,
     id = id_var_values,
     pool = pool %>% pull()
-  ) %>%
-    reshape2::melt(id.vars = c("id", "pool"),factorsAsStrings=FALSE) %>%
+  )
+  variable_decomp = variable_decomp %>% 
+    pivot_longer(cols = c('(Intercept)',names(coef)),
+                 names_to = 'variable',
+                 values_to = 'value') %>% 
+    arrange(variable,id) %>% 
     rename(contrib = value)
 
   # if an id variable name is provided use it
@@ -294,13 +313,13 @@ decomping = function(model = NULL,
   if (raw_actual_supplied & de_normalise) {
     # check if meta_data is provided
     if (is.null(meta_data)) {
-      if(verbose)cat("\n Warning: meta_data not found in model, but required to de-normalised.")
+      if(verbose)message("Warning: meta_data not found in model, but required to de-normalised.")
     } else{
       # else check if the dv is not in meta_data
       if (!(dv %in% meta_data$variable)) {
         # if the dv is not found in the norm table if(verbose)print warning
         ### STA could work if the de_normalise is true
-        cat("\n Warning: dv not found in meta_data.")
+        message("Warning: dv not found in meta_data.")
 
       } else{
         pool_mean = tibble(raw_actual = raw_actual %>% pull(),
@@ -327,7 +346,7 @@ decomping = function(model = NULL,
   if (is.null(categories)) {
     if(all(model_table$category == "")){
       if(verbose){
-        cat("Warning: no categories table provided and no categories found in model_table. Setting category_decomp = variable_decomp.\n")
+        message("Warning: no categories table provided and no categories found in model_table. Setting category_decomp = variable_decomp.")
       }
       category_decomp = variable_decomp
     }else{
@@ -340,13 +359,13 @@ decomping = function(model = NULL,
   } else if(!is.data.frame(categories)){
     if(all(model_table$category == "")){
       if(verbose){
-        cat("Warning: categories table provided is not a data.frame and no categories found in model_table. Setting category_decomp = variable_decomp.\n")
+        message("Warning: categories table provided is not a data.frame and no categories found in model_table. Setting category_decomp = variable_decomp.")
       }
       category_decomp = variable_decomp
     }else{
 
       if(verbose){
-        cat("Warning: categories provided must be of type data.frame. Using model_table categories.\n")
+        message("Warning: categories provided must be of type data.frame. Using model_table categories.")
       }
       # create category from model table categories
       categories = model_table %>%
@@ -356,17 +375,17 @@ decomping = function(model = NULL,
     }
   }else if(!(all(c('variable','category') %in% colnames(categories)))){
     if(verbose){
-      cat("Warning: categories provided must contain atleast columns 'variable' and 'category'.\n")
+      message("Warning: categories provided must contain atleast columns 'variable' and 'category'.")
     }
     if(all(model_table$category == "")){
       if(verbose){
-        cat("Warning: categories table provided is not a data.frame and no categories found in model_table. Setting category_decomp = variable_decomp.\n")
+        message("Warning: categories table provided is not a data.frame and no categories found in model_table. Setting category_decomp = variable_decomp.")
       }
       category_decomp = variable_decomp
     }else{
 
       if(verbose){
-        cat("Warning: categories provided must be of type data.frame. Using model_table categories.\n")
+        message("Warning: categories provided must be of type data.frame. Using model_table categories.")
       }
       # create category from model table categories
       categories = model_table %>%
@@ -380,7 +399,7 @@ decomping = function(model = NULL,
 
     if(!('calc' %in% colnames(categories))){
       if(verbose){
-        cat("Warning: categories type data.frame provided does not include a 'calc' column. Setting all categories to 'none'.\n")
+        message("Warning: categories type data.frame provided does not include a 'calc' column. Setting all categories to 'none'.")
       }
       categories$calc = 'none'
     }
@@ -496,7 +515,7 @@ decomp_chart = function(model = NULL,
 
   # Check verbose
   if(!is.logical(verbose)){
-    cat("\n Warning: verbose must be logical (TRUE or FALSE). Setting to False.")
+    message("Warning: verbose must be logical (TRUE or FALSE). Setting to False.")
     verbose = FALSE
   }
 
@@ -504,7 +523,7 @@ decomp_chart = function(model = NULL,
   if(is.null(model)){
     if(is.null(decomp_list)){
       if(verbose){
-        cat("\n Error: no decomp_list provided. Returning NULL.")
+        message("Error: no decomp_list provided. Returning NULL. ")
       }
       return(NULL)
     }
@@ -529,7 +548,7 @@ decomp_chart = function(model = NULL,
   }
   if(!all(c("pool","variable","contrib") %in% colnames(decomp))){
     if(verbose){
-      cat("\n Error: decomp table must include 3 columns called 'pool', 'variable' and 'value'. Returning NULL.")
+      message("Error: decomp table must include 3 columns called 'pool', 'variable' and 'value'. Returning NULL. ")
     }
     return(NULL)
   }
@@ -543,7 +562,7 @@ decomp_chart = function(model = NULL,
   }
   if(!all(c("pool","variable","value") %in% colnames(fitted_values))){
     if(verbose){
-      cat("\n Error: fitted_values table must include 3 columns called 'pool', 'variable' and 'value'. Returning NULL.")
+      message("Error: fitted_values table must include 3 columns called 'pool', 'variable' and 'value'. Returning NULL.")
     }
     return(NULL)
   }
@@ -559,7 +578,7 @@ decomp_chart = function(model = NULL,
 
     if(!any(decomp$pool == pool)){
       if(verbose){
-        cat("\n Warning: POOL ",pool," not found. No POOL filtering applied.")
+        message("Warning: POOL ",pool," not found. No POOL filtering applied.")
       }
       decomp = decomp %>%
         rename(value = contrib)
@@ -573,7 +592,7 @@ decomp_chart = function(model = NULL,
 
   if(is.null(pool)){
     if(verbose){
-      cat("\n Warning: no pool provided. Aggregating by id_var.")
+      message("Warning: no pool provided. Aggregating by id_var.")
     }
 
     fitted_values = fitted_values %>%
@@ -649,10 +668,15 @@ fit_chart = function(model = NULL,
                      verbose = FALSE,
                      colors = NULL) {
 
-
+  # model = run_model(data = mtcars,dv = 'mpg',ivs = 'cyl')
+  # decomp_list = NULL
+  # pool = NULL
+  # verbose = FALSE
+  # colors = NULL
+  
   # Check verbose
   if(!is.logical(verbose)){
-    cat("\n Warning: verbose must be logical (TRUE or FALSE). Setting to False.")
+    message("Warning: verbose must be logical (TRUE or FALSE). Setting to False.")
     verbose = FALSE
   }
 
@@ -661,7 +685,7 @@ fit_chart = function(model = NULL,
   if(is.null(model)){
     if(is.null(decomp_list)){
       if(verbose){
-        cat("\n Error: no decomp_list provided. Returning NULL.")
+        message("Error: no decomp_list provided. Returning NULL.")
       }
       return(NULL)
     }
@@ -678,7 +702,7 @@ fit_chart = function(model = NULL,
   if (!is.null(pool)) {
     if(!any(fitted_values$pool == pool)){
       if(verbose){
-        cat("\n Warning: POOL ",pool," not found. No POOL filtering applied.")
+        message("Warning: POOL ",pool," not found. No POOL filtering applied.")
       }
     }
     else{
@@ -688,7 +712,7 @@ fit_chart = function(model = NULL,
 
   if(is.null(pool)){
     if(verbose){
-      cat("\n Warning: no pool provided. Aggregating by id_var.")
+      message("Warning: no pool provided. Aggregating by id_var.")
     }
     fitted_values = fitted_values %>%
       group_by(variable,!!sym(id_var)) %>%
@@ -772,7 +796,7 @@ resid_hist_chart = function(model = NULL,
                             verbose = FALSE){
   # Check verbose
   if(!is.logical(verbose)){
-    cat("\n Warning: verbose must be logical (TRUE or FALSE). Setting to False.")
+    message("Warning: verbose must be logical (TRUE or FALSE). Setting to False.")
     verbose = FALSE
   }
 
@@ -781,7 +805,7 @@ resid_hist_chart = function(model = NULL,
   if(is.null(model)){
     if(is.null(decomp_list)){
       if(verbose){
-        cat("\n Error: no decomp_list provided. Returning NULL.")
+        message("Error: no decomp_list provided. Returning NULL.")
       }
       return(NULL)
     }
@@ -843,7 +867,7 @@ heteroskedasticity_chart = function(model = NULL,
 
   # Check verbose
   if (!is.logical(verbose)) {
-    cat("\n Warning: verbose must be logical (TRUE or FALSE). Setting to False.")
+    message("Warning: verbose must be logical (TRUE or FALSE). Setting to False.")
     verbose = FALSE
   }
 
@@ -852,7 +876,7 @@ heteroskedasticity_chart = function(model = NULL,
   if (is.null(model)) {
     if (is.null(decomp_list)) {
       if (verbose) {
-        cat("\n Error: no decomp_list provided. Returning NULL.")
+        message("Error: no decomp_list provided. Returning NULL.")
       }
       return(NULL)
     }
@@ -919,7 +943,7 @@ acf_chart = function(model = NULL,
 
   # Check verbose
   if (!is.logical(verbose)) {
-    cat("\n Warning: verbose must be logical (TRUE or FALSE). Setting to False.")
+    message("Warning: verbose must be logical (TRUE or FALSE). Setting to False.")
     verbose = FALSE
   }
 
@@ -928,7 +952,7 @@ acf_chart = function(model = NULL,
   if (is.null(model)) {
     if (is.null(decomp_list)) {
       if (verbose) {
-        cat("\n Error: no decomp_list provided. Returning NULL.")
+        message("Error: no decomp_list provided. Returning NULL.")
       }
       return(NULL)
     }
@@ -1028,169 +1052,213 @@ acf_chart = function(model = NULL,
 #' @param colors character vector of colors in hexadecimal notation
 #' @param verbose A boolean to specify whether to print warnings
 #' @param table A boolean to specify whether to return a \code{data.frame} of the response curves
+#' @param points A boolean to specify whether to include the points from the data on the curve
+#' @param plotly A boolean to specify whether to include use ggplot over plotly
+#' @param add_intercept A boolean to specify whether to include the intercept whne calculating the curves
+#' @importFrom ggplot2 ggplot geom_line scale_color_manual theme ggtitle ylab geom_vline geom_hline element_rect aes
 #' @import plotly
 #' @import tidyverse
 #' @import tibble
 #' @importFrom RColorBrewer brewer.pal
 #' @importFrom stats na.omit
-#' @importFrom rlist list.append
 #' @export
 #' @return a \code{plotly} line chart of the model's response curves
 #' @examples
-#' run_model(data = mtcars,dv = 'mpg',ivs = c('wt','cyl','disp')) %>%
+#' model = run_model(data = mtcars,dv = 'mpg',ivs = c('disp'))
+#' model %>%
 #'    response_curves()
-#' run_model(data = scale(mtcars) %>% data.frame(),dv = 'mpg',ivs = c('wt','cyl','disp')) %>%
+#' model = run_model(data = mtcars,dv = 'mpg',ivs = c('wt','cyl','disp')) 
+#' 
+#' model %>%
+#'    response_curves()
+#'    
+#' run_model(data = scale(mtcars) %>% 
+#'               data.frame(),
+#'           dv = 'mpg',
+#'           ivs = c('wt','cyl','disp')) %>%
 #'    response_curves()
 response_curves = function(
-  model,
-  x_min = -100,
-  x_max = 100,
-  y_min = -100,
-  y_max = 100,
-  interval = 0.1,
-  trans_only = FALSE,
-  colors = color_palette(),
-  verbose = FALSE,
-  table = FALSE){
-  # Set up                ------------------------------------------------------------------
+    model,
+    x_min = NULL,
+    x_max = NULL,
+    y_min = NULL,
+    y_max = NULL,
+    interval = NULL,
+    trans_only = FALSE,
+    colors = color_palette(),
+    plotly = TRUE,
+    verbose = FALSE,
+    table = FALSE,
+    add_intercept = FALSE,
+    points = FALSE){
+  # checks  ####
+  # model = run_model(data = mtcars,dv = 'mpg',ivs = c('disp','wt'))
+  # x_min = NULL
+  # x_max = NULL
+  # y_min = NULL
+  # y_max = NULL
+  # interval = NULL
+  # trans_only = FALSE
+  # colors = color_palette()
+  # plotly = TRUE
+  # verbose = FALSE
+  # table = FALSE
+  # add_intercept = FALSE
+  # points = FALSE
+  
+  if (is.null(x_max)) x_max = 1e+05
+  if (is.null(x_min)) x_min = -1e+05
+  if (is.null(interval)) interval = (x_max-x_min)/100
+  if (is.null(y_max)) y_max = x_max
+  if (is.null(y_min)) y_min = x_min
 
-  if (is.null(x_max))x_max = 100000
-  if (is.null(x_min))x_min = 0
-  if (is.null(interval))interval = x_max/1000
-  if (is.null(y_max))y_max = x_max
-  if (is.null(y_min))y_min = x_min
-
+  # process ####
   optim_table = model$output_model_table
-  trans_df = model$trans_df
 
-  # filter only trans variables
-  if(trans_only){
-    optim_table = optim_table[!(((optim_table[trans_df$name] == "") %>%
-                                   data.frame() %>%
-                                   rowSums()) == nrow(trans_df)), ]
+
+  trans_df = model$trans_df %>%
+    filter(ts == FALSE)
+
+  if (trans_only) {
+    optim_table = optim_table[!(((optim_table[trans_df$name] ==
+                                    "") %>% data.frame() %>% rowSums()) == nrow(trans_df)),
+    ]
   }
-
-  # select only relevant columns
-  optim_table = optim_table %>%
-    filter(variable != '(Intercept)')
-
-  optim_table = optim_table[c('variable',
-                              'variable_t',
-                              trans_df$name,
-                              'coef')] %>%
-    na.omit()
-
-  # if no dim_rets > 0 return null
-  if(nrow(optim_table)==0){
-    if(verbose)print('All trans in model_table are blank.')
-    return(plot_ly())
+  optim_table = optim_table %>% filter(variable != "(Intercept)")
+  optim_table = optim_table[c("variable", "variable_t",
+                              trans_df$name, "coef")] %>% na.omit()
+  if (nrow(optim_table) == 0) {
+    message("Error: Check model and/or model_table.")
+    return(NULL)
   }
-
-  # colors
-  # colors = brewer.pal(nrow(optim_table), "Set1") %>%
-  #   suppressWarnings()
-
-  # Curve DF              -------------------
-
-  # list to be populated with curves
   curves_df = list()
-
-  # for each var
-  for(i in 1:nrow(optim_table)){
-
-    # name and coef of the variable
+  x_raw = seq(x_min, x_max, interval)
+  for (i in 1:nrow(optim_table)) {
     var = optim_table$variable_t[i]
     coef = optim_table$coef[i]
-
-    # x-axis to generate the curve (y)
-    x_raw = seq(x_min, x_max, interval)
     x = x_raw
-
-    # for each trans
-    for(j in 1:nrow(model$trans_df)){
-
-      t_name = model$trans_df$name[j]
-      t_func = model$trans_df$func[j]
-
-      param_vals =  model$output_model_table %>%
+    for (j in 1:nrow(trans_df)) {
+      t_name = trans_df$name[j]
+      t_func = trans_df$func[j]
+      param_vals = model$output_model_table %>%
         filter(variable_t == var) %>%
         pull(!!sym(t_name)) %>%
-        strsplit(split = ',')
-      param_vals = param_vals[[1]] %>%
-        as.numeric()
+        strsplit(split = ",")
 
-      # if no params, trans is not being applied
-      if(length(param_vals) == 0){
+      param_vals = param_vals[[1]] %>% as.numeric()
+      if (length(param_vals) == 0) {
         next
       }
-
       param_names = letters[1:length(param_vals)]
-
       e <- new.env()
-
-      # for each param
-      for(k in 1:length(param_vals)){
-        # create the param variable in the environment
-
+      for (k in 1:length(param_vals)) {
         p_name = param_names[k]
         p_val = param_vals[k]
-
-
-        assign(p_name,p_val,envir = e)
+        assign(p_name, p_val, envir = e)
       }
-
-      # apply transformation to x
-      x = t_func %>%
-        run_text(env = e)
-
+      x = t_func %>% run_text(env = e)
     }
+    
+    df = data.frame(value = x * coef,
+                    variable = var,
+                    x = x_raw) %>%
+      mutate(value = as.numeric(value)) %>%
+      mutate(variable = as.character(variable)) %>%
+      mutate(x = as.numeric(x))
+    
+    curves_df = append(curves_df, list(df))
+  }
+  curves_df = curves_df %>%
+    Reduce(f = rbind)
 
-    curves_df = list.append(
-      curves_df,
-      data.frame(value = x * coef,
-                 variable = var,
-                 x = x_raw) %>%
-        mutate(value = as.numeric(value)) %>%
-        mutate(variable = as.character(variable)) %>%
-        mutate(x = as.numeric(x)))
+  if(add_intercept){
+    curves_df = curves_df %>%
+      mutate(value = value + model$coefficients[1])
   }
 
   curves_df = curves_df %>%
-    purrr::reduce(rbind) %>%
     filter(value >= y_min) %>%
     filter(value <= y_max)
 
-  if(table){return(curves_df)}
 
-  # PLOTS                 -------------------
+  if (table) {
+    return(curves_df)
+  }
 
-  # plot curves
-  p = plot_ly()
+  # plotly  ####
+  if(plotly){
 
-  # plot curves
+    p = plot_ly()
+    p = p %>% add_trace(data = curves_df, x = ~x, y = ~value,
+                        color = ~variable, mode = "lines", type = "scatter",
+                        colors = colors) %>%
+      layout(plot_bgcolor = "rgba(0, 0, 0, 0)",
+             paper_bgcolor = "rgba(0, 0, 0, 0)",
+             font = list(color = "#1c0022"),
+             xaxis = list(showgrid = FALSE),
+             yaxis = list(title = model$dv),
+             title = "Response Curves")
 
-  p =  p %>%
-    add_trace(
-      data = curves_df,
-      x = ~ x,
-      y = ~ value,
-      color = ~ variable,
-      mode = "lines",
-      type = "scatter",
-      colors = colors
-    ) %>%
-    layout(
-      plot_bgcolor  = "rgba(0, 0, 0, 0)",
-      paper_bgcolor = "rgba(0, 0, 0, 0)",
-      font = list(color = '#1c0022'),
-      xaxis = list(
-        showgrid = FALSE
-      ),
-      yaxis = list(
-        title = model$dv
-      ),
-      title = 'Response Curves'
-    )
+    if(points) {
+
+      raw_data = model$model
+
+      # calculate predicted points through functions
+      curves_df = list()
+      for (i in 1:nrow(optim_table)) {
+        var = optim_table$variable_t[i]
+        coef = optim_table$coef[i]
+        x_raw = raw_data %>% pull(!!sym(var))
+        x = x_raw
+        for (j in 1:nrow(trans_df)) {
+          t_name = trans_df$name[j]
+          t_func = trans_df$func[j]
+          param_vals = model$output_model_table %>% filter(variable_t ==
+                                                             var) %>% pull(!!sym(t_name)) %>% strsplit(split = ",")
+          param_vals = param_vals[[1]] %>% as.numeric()
+          if (length(param_vals) == 0) {
+            next
+          }
+          param_names = letters[1:length(param_vals)]
+          e <- new.env()
+          for (k in 1:length(param_vals)) {
+            p_name = param_names[k]
+            p_val = param_vals[k]
+            assign(p_name, p_val, envir = e)
+          }
+          x = t_func %>% run_text(env = e)
+        }
+        curves_df =  append(curves_df, data.frame(value = x *
+                                                        coef, variable = var, x = x_raw) %>% mutate(value = as.numeric(value)) %>%
+                                  mutate(variable = as.character(variable)) %>% mutate(x = as.numeric(x)))
+      }
+      curves_df = curves_df %>%
+        data.frame() #%>%
+      # filter(value >= y_min) %>% filter(value <= y_max)
+
+
+      # add points to plotly item
+      p = p %>%  add_trace(data = curves_df, x = ~x, y = ~value,
+                           color = ~variable, mode = "markers", type = "scatter",
+                           colors = colors)
+    }
+
+  }
+  # ggplot  ####
+  if(!plotly){
+    
+    p = ggplot(data=curves_df, aes(x=x, y=value, col=variable)) +
+      geom_line() +
+      scale_color_manual(values = color_palette()) +
+      theme(
+        panel.background = element_rect(fill = "white",
+                                        colour = "white")) +
+      ggtitle("Response Curves") +
+      ylab(model$dv) +
+      geom_vline(xintercept = 0) +
+      geom_hline(yintercept = 0)
+    
+  }
 
   return(p)
 }

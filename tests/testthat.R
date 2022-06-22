@@ -1,8 +1,8 @@
 # libs   ####
 library(testthat)
 library(linea)
-library(rlist)
 library(dplyr)
+library(tidyr)
 
 # test_check("linea")
 
@@ -26,13 +26,8 @@ ivs = c("black.friday", "christmas", "covid")
 id_var = "date"
 
 # model table
-model_table = tibble(
-  variable = ivs,
-  decay = c(0.5, 0, 0),
-  diminish = c(0, 0, 0),
-  lag = c(0, 0, 0),
-  ma = c(0, 0, 0)
-)
+model_table = build_model_table(ivs)
+model_table$dec[1] = '0.5'
 
 # category
 category = tibble(
@@ -168,13 +163,13 @@ test_that('run_model ivs, dv',{
 ### next steps  ---------------------------------------------------------------
 
 test_that("what next - output dataframe", {
-  model %>% 
+  model %>%
     what_next() %>%
     is.data.frame() %>%
     expect_equal(TRUE)
 })
 test_that("what next - output not all na", {
-  model %>% 
+  model %>%
     what_next() %>%
     select(-variable) %>%
     is.na() %>%
@@ -183,13 +178,13 @@ test_that("what next - output not all na", {
 })
 
 test_that("what next - output dataframe - diff FALSE - not pooled", {
-  model %>% 
+  model %>%
     what_next(r2_diff = FALSE) %>%
     is.data.frame() %>%
     expect_equal(TRUE)
 })
 test_that("what next - output not all na - diff FALSE - not pooled", {
-  model %>% 
+  model %>%
     what_next(r2_diff = FALSE) %>%
     select(-variable) %>%
     is.na() %>%
@@ -198,13 +193,13 @@ test_that("what next - output not all na - diff FALSE - not pooled", {
 })
 
 test_that("what next - pooled - output dataframe", {
-  pooled_model %>% 
+  pooled_model %>%
     what_next() %>%
     is.data.frame() %>%
     expect_equal(TRUE)
 })
 test_that("what next - pooled - output not all na", {
-  pooled_model %>% 
+  pooled_model %>%
     what_next() %>%
     select(-variable) %>%
     is.na() %>%
@@ -216,6 +211,7 @@ test_that("what trans - output dataframe", {
   run_model(data = mtcars,dv = 'mpg',ivs = c('disp','cyl')) %>%
     what_trans(variable = 'cyl',trans_df = data.frame(
     name = c('diminish', 'decay', 'lag', 'ma', 'log', 'hill', 'sin', 'exp'),
+    ts = c(FALSE,TRUE,TRUE,TRUE,FALSE,FALSE,FALSE,FALSE),
     func = c('linea::diminish(x,a)',
              'linea::decay(x,a)',
              'linea::lag(x,a)',
@@ -228,13 +224,14 @@ test_that("what trans - output dataframe", {
       dplyr::mutate(val = dplyr::if_else(condition = name == 'hill',
                                          '(1,5,50),(1 ,5,50),(1,5,50)',
                                          val))) %>%
-    is.data.frame() %>% 
+    is.data.frame() %>%
     expect_equal(TRUE)
 })
 test_that("what trans - output not all na", {
   run_model(data = mtcars,dv = 'mpg',ivs = c('disp','cyl')) %>%
   what_trans(variable = 'cyl',trans_df = data.frame(
   name = c('diminish', 'decay', 'lag', 'ma', 'log', 'hill', 'sin', 'exp'),
+  ts = c(FALSE,TRUE,TRUE,TRUE,FALSE,FALSE,FALSE,FALSE),
   func = c('linea::diminish(x,a)',
            'linea::decay(x,a)',
            'linea::lag(x,a)',
@@ -258,6 +255,7 @@ test_that("what combo - output dataframe", {
   ivs = c('christmas','black.friday')
   combo_trans_df = data.frame(
     name = c('diminish', 'decay', 'hill', 'exp'),
+    ts = c(FALSE,TRUE,FALSE,FALSE),
     func = c(
       'linea::diminish(x,a)',
       'linea::decay(x,a)',
@@ -278,10 +276,10 @@ test_that("what combo - output dataframe", {
     dplyr::mutate(online_media = dplyr::if_else(condition = name == 'exp',
                                                 '.5,2,3',
                                                 online_media)) %>%
-    dplyr::mutate(promo = '') %>% 
-    {what_combo(trans_df = .,dv = dv,data = data)} %>% 
-    {.[['results']]} %>% 
-    is.data.frame() %>% 
+    dplyr::mutate(promo = '') %>%
+    {what_combo(trans_df = .,dv = dv,data = data)} %>%
+    {.[['results']]} %>%
+    is.data.frame() %>%
     expect_equal(TRUE)
 })
 test_that("what combo - output not all na", {
@@ -290,6 +288,7 @@ test_that("what combo - output not all na", {
   ivs = c('christmas','black.friday')
   combo_trans_df = data.frame(
     name = c('diminish', 'decay', 'hill', 'exp'),
+    ts = c(FALSE,TRUE,FALSE,FALSE),
     func = c(
       'linea::diminish(x,a)',
       'linea::decay(x,a)',
@@ -310,9 +309,9 @@ test_that("what combo - output not all na", {
     dplyr::mutate(online_media = dplyr::if_else(condition = name == 'exp',
                                                 '.5,2,3',
                                                 online_media)) %>%
-    dplyr::mutate(promo = '') %>% 
-    {what_combo(trans_df = .,dv = dv,data = data)} %>% 
-    {.[['results']]} %>% 
+    dplyr::mutate(promo = '') %>%
+    {what_combo(trans_df = .,dv = dv,data = data)} %>%
+    {.[['results']]} %>%
     is.na() %>%
     all() %>%
     expect_equal(FALSE)
