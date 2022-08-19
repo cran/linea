@@ -1,6 +1,6 @@
 Package: linea
 Title: Linear Regression Interface
-Version: 0.0.2
+Version: 0.0.3
 Authors@R: 
     person("Claudio", "Paladini", , "claudio.paladini@bath.edu", role = c("aut", "cre"),
            comment = c(ORCID = "0000-0002-5551-1380"))
@@ -19,8 +19,8 @@ RoxygenNote: 7.2.0
 Suggests: testthat (>= 3.0.0)
 Config/testthat/edition: 3
 NeedsCompilation: no
-Packaged: 2022-06-22 21:16:06 UTC; 44751
+Packaged: 2022-08-19 07:41:06 UTC; 44751
 Author: Claudio Paladini [aut, cre] (<https://orcid.org/0000-0002-5551-1380>)
 Maintainer: Claudio Paladini <claudio.paladini@bath.edu>
 Repository: CRAN
-Date/Publication: 2022-06-22 22:20:02 UTC
+Date/Publication: 2022-08-19 08:20:02 UTC

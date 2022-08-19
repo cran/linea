@@ -1,9 +1,9 @@
-ec40bd3039eab63870eee761b1290f5b *DESCRIPTION
+c1210fc54419b4c22d2ed208041caf01 *DESCRIPTION
 a9b755ae784e43e6fecab48e0315e687 *NAMESPACE
-09bf81256e0ad0804ff91117931f0a4a *NEWS.md
+ced9da4d9a0d5a2b670d3df0e5aeb1a6 *NEWS.md
 245d1656ff764458ef487bb615f09272 *R/charting.R
 f351ef4147c7008e47de0d738367a3dc *R/global.R
-96990d376f47968396f7d5afb6867d2f *R/google_trends.R
+9f19644236df0b0bbb38ead161e7adc8 *R/google_trends.R
 ca655e2eccca82b42b017305b692ad1f *R/model_file.R
 22e9dc27d6290bc4bcb15adf198c67ea *R/model_next_step.R
 9136f913bcb6e45635104ca2cb424327 *R/model_run.R
