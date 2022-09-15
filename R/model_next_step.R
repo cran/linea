@@ -15,13 +15,28 @@
 #' @export
 #' @return \code{data.frame} mapping variables' to the respective model's statistics.
 #' @examples
-#' run_model(data = mtcars,dv = 'mpg',ivs = c('disp','cyl')) %>% what_next()
+#' run_model(
+#'     data = mtcars,
+#'     dv = 'mpg',
+#'     ivs = c('disp', 'cyl')
+#'   ) %>% 
+#'   what_next()
 what_next = function(model = NULL,
                      data = NULL,
                      verbose = FALSE,
                      r2_diff = TRUE) {
-  # checks  ####
 
+  # test    ####
+  
+  # model = run_model(data = mtcars,'mpg',ivs = 'cyl',save_all_raw_data = F)
+  # model = run_model(data = mtcars,'mpg',ivs = 'cyl',save_all_raw_data = T)
+  # data = NULL
+  # verbose = FALSE
+  # r2_diff = TRUE
+  # model %>% what_next()
+
+  # checks  ####
+  
   # check verbose
   if (!is.logical(verbose)) {
     message("Warning: verbose provided mus be logical (TRUE or FALSE). Setting to False.")
@@ -35,82 +50,45 @@ what_next = function(model = NULL,
 
   # check if model or model_table is provided is correct
   if (is.null(model)) {
-    message("Error: no model provided. Returning NULL.")
+    message("Error: No model provided. Returning NULL.")
     return(NULL)
-  } else{
-    if (!is(model,class2 = 'lm')) {
-      message("Error: model must be of type 'lm'. Returning NULL.")
-      return(NULL)
-    }
-    else{
-      if (!('dv' %in% names(model))) {
-        message("Error: model object must contain 'dv'. Returning NULL.")
-        return(NULL)
-      } else{
-        dv = model$dv
-      }
-
-      if (!('model_table' %in% names(model))) {
-        message("Error: model object must contain 'model_table'. Returning NULL.")
-        return(NULL)
-      } else{
-        model_table = model$model_table
-      }
-
-      if (!('meta_data' %in% names(model))) {
-        message("Warning: model object does not contain 'meta_data'.")
-      }
-      meta_data = model$meta_data
-
-      if (!('id_var' %in% names(model))) {
-        message("Warning: model object does not contain 'id_var'.")
-      }
-      id_var = model$id_var
-
-      if (!('trans_df' %in% names(model))) {
-        message("Warning: model object does not contain 'trans_df'.")
-      }
-      trans_df = model$trans_df
-
-      if (!('normalise_by_pool' %in% names(model))) {
-        if (verbose)
-          message("Warning: model object does not contain normalise_by_pool. Setting to FALSE.")
-        normalise_by_pool = FALSE
-      } else{
-        normalise_by_pool = model$normalise_by_pool
-      }
-
-    }
   }
-
+  if (!is(model,class2 = 'lm')) {
+    message("Error: model must be of type 'lm'. Returning NULL.")
+    return(NULL)
+  }
+  
+  dv = model$dv
+  model_table = model$model_table
+  pool_var = model$pool_var
+  id_var = model$id_var
+  trans_df = model$trans_df
+  normalise_by_pool = model$normalise_by_pool
+  
   if (is.null(data)) {
-    if (!('data' %in% names(model))) {
-      message(
-        "Error: no data provided and model object does not contain 'data'. Returning NULL."
-      )
-      return(NULL)
-    } else{
-      data = model$data
-    }
+    data = model$raw_data
   }
 
+  ivs = model_table$variable %>% unique()
+  test_ivs = colnames(data)
+  test_ivs = test_ivs[!(test_ivs %in% c(ivs, dv, id_var, pool_var))]
+  
+  if(length(test_ivs)==0){
+    message('Error: No new columns found in data. Returning NULL.')
+    return(NULL)
+  }
+  
   # process ####
 
   #timer
   start_time = Sys.time()
-
-
-  ivs = model_table$variable %>% unique()
-  test_ivs = colnames(data)
-  test_ivs = test_ivs[!(test_ivs %in% c(ivs, dv, id_var))]
 
   #1. get normalized value of non-test-vars
   if (normalise_by_pool) {
     norm_data = apply_normalisation(
       verbose = verbose,
       raw_data = data,
-      # model_table =  model_table,
-      meta_data = meta_data,
+      pool_var = pool_var,
       dv = dv
     )
     if (normalise_by_pool & length(norm_data) == 2) {
@@ -120,14 +98,12 @@ what_next = function(model = NULL,
     norm_data = data
   }
 
-
   #2. get transformed value of non-test-vars
   trans_data = apply_transformation(
-    data = norm_data,
+    raw_data = norm_data,
     trans_df = trans_df,
     verbose = verbose,
-    model_table = model_table,
-    meta_data = meta_data
+    pool_var = pool_var
   )
 
   model_vars_t = model_table %>%
@@ -173,9 +149,18 @@ what_next = function(model = NULL,
 
     }
   })
+  
+  if(length(df)==1){
+    df = purrr::reduce(df, rbind) %>%
+      t() %>% 
+      data.frame()
+  } else if(length(df)>1){
+    df = purrr::reduce(df, rbind) %>%
+      data.frame()
+  }
 
-  df = purrr::reduce(df, rbind) %>%
-    data.frame() %>%
+
+  df = df %>%
     tibble() %>%
     rename(
       variable = 1,
@@ -287,6 +272,30 @@ what_trans = function(model = NULL,
                       data = NULL,
                       r2_diff = TRUE,
                       verbose = FALSE) {
+  # tests   ####
+  
+  # model = run_model(data = mtcars,dv = 'mpg',ivs = c('disp','cyl'))
+  # 
+  # trans_df = data.frame(
+  #      name = c('diminish', 'decay', 'lag', 'ma', 'log', 'hill', 'sin', 'exp'),
+  #      ts = c(FALSE,TRUE,TRUE,TRUE,FALSE,FALSE,FALSE,FALSE),
+  #      func = c('linea::diminish(x,a)',
+  #               'linea::decay(x,a)',
+  #               'linea::lag(x,a)',
+  #               'linea::ma(x,a)',
+  #               'log(x,a)',
+  #               "linea::hill_function(x,a,b,c)",
+  #               'sin(x*a)',
+  #               '(x^a)'),order = 1:8) %>%
+  #   dplyr::mutate(val = '') %>%
+  #   dplyr::mutate(val = dplyr::if_else(condition = name == 'hill',
+  #                                      '(1,5,50),(1 ,5,50),(1,5,50)',
+  #                                      val))
+  # variable = 'cyl'
+  # data = NULL
+  # r2_diff = TRUE
+  # verbose = FALSE
+  
   # checks  ####
 
   # data = NULL
@@ -315,7 +324,7 @@ what_trans = function(model = NULL,
   # check if model or model_table is provided is correct
   if (is.null(model)) {
     if (is.null(model_table)) {
-      message("Error: no model or model_table provided. Returning NULL.")
+      message("Error: No model or model_table provided. Returning NULL.")
       return(NULL)
     }
   } else{
@@ -342,24 +351,22 @@ what_trans = function(model = NULL,
 
   # check data
   if (is.null(data)) {
-    data = model$data
+    data = model$raw_data
     if (is.null(data)) {
-      message('Error: no data provided as data or in model.')
+      message('Error: No data provided as data or in model.')
     }
   }
 
   # check pool
   if (model$normalise_by_pool) {
-    meta_data = model$meta_data
-    pool = meta_data$variable[toupper(meta_data$meta) == 'POOL']
+    
     groups = data %>%
-      pull(!!sym(pool)) %>%
+      pull(!!sym(model$pool_var)) %>%
       unique()
 
     data = apply_normalisation(
       raw_data = data,
-      # model_table =  model$model_table,
-      meta_data = model$meta_data,
+      pool_var = model$pool_var,
       dv = model$dv,
       verbose = verbose
     )
@@ -373,10 +380,10 @@ what_trans = function(model = NULL,
   }
 
   data = apply_transformation(
-    data = data,
+    raw_data = data,
     model_table = model$model_table,
     trans_df = model$trans_df,
-    meta_data = model$meta_data,
+    pool_var = model$pool_var,
     verbose = verbose
   )
 
@@ -499,9 +506,9 @@ what_trans = function(model = NULL,
       if (model$normalise_by_pool) {
         for (g in groups) {
           # g=groups[1]
-          x = data$temp_var[data[, pool] == g]
+          x = data$temp_var[data[, model$pool_var] == g]
           x = f %>% run_text(env = e)
-          data$temp_var[data[, pool] == g] = x
+          data$temp_var[data[, model$pool_var] == g] = x
 
         }
       } else{
@@ -623,9 +630,6 @@ what_trans = function(model = NULL,
 #'   dplyr::mutate(offline_media = dplyr::if_else(condition = name == 'decay',
 #'                                               '.1,.7 ',
 #'                                               offline_media)) %>%
-#'   dplyr::mutate(online_media = dplyr::if_else(condition = name == 'decay',
-#'                                               '.1,.7 ',
-#'                                               '')) %>%
 #'   dplyr::mutate(promo = '')
 #'
 #' model = run_model(data = data,dv = dv,ivs = ivs, trans_df = trans_df)
@@ -646,7 +650,40 @@ what_combo = function(model = NULL,
   # - trans_df columns
   # - check vars are in data
   # - dv in data
-
+  
+  # test    ####
+  
+  # raw_data = read_xcsv(verbose = FALSE,
+  #                         file = "https://raw.githubusercontent.com/paladinic/data/main/pooled%20data.csv")
+  # dv = "amazon"
+  # ivs = c("rakhi", "diwali")
+  # id_var = "Week"
+  # pool_var = 'country'
+  # 
+  # model_table = build_model_table(c(ivs, "", ""))
+  # model = run_model(
+  #   id_var = id_var,
+  #   verbose = FALSE,
+  #   data = raw_data,
+  #   dv = dv,
+  #   pool_var = pool_var,
+  #   model_table = model_table,
+  #   normalise_by_pool = TRUE
+  # )
+  # 
+  # wc_trans_df = model$trans_df %>% 
+  #   mutate(christmas = if_else(name == 'decay','.1,.5,.9',''))
+  # 
+  # trans_df = wc_trans_df
+  # 
+  # model %>% what_combo(trans_df = trans_df)
+  # 
+  # data = NULL
+  # dv = NULL
+  # r2_diff = TRUE
+  # return_model_objects = FALSE
+  # verbose = FALSE
+  
   # checks  ####
 
   if (!is.logical(verbose)) {
@@ -695,7 +732,7 @@ what_combo = function(model = NULL,
         }
       }
       if (is.null(data)) {
-        data = model$data
+        data = model$raw_data
       }
     }
   }
@@ -704,16 +741,14 @@ what_combo = function(model = NULL,
 
   # check pool
   if (model$normalise_by_pool) {
-    meta_data = model$meta_data
-    pool = meta_data$variable[toupper(meta_data$meta) == 'POOL']
+    
     groups = data %>%
-      pull(!!sym(pool)) %>%
+      pull(!!sym(model$pool_var)) %>%
       unique()
 
     data = apply_normalisation(
       raw_data = data,
-      # model_table =  model$model_table,
-      meta_data = model$meta_data,
+      pool_var = model$pool_var,
       dv = model$dv,
       verbose = verbose
     )
@@ -727,10 +762,10 @@ what_combo = function(model = NULL,
   }
 
   data = apply_transformation(
-    data = data,
+    raw_data = data,
     model_table = model$model_table,
     trans_df = model$trans_df,
-    meta_data = model$meta_data,
+    pool_var = model$pool_var,
     verbose = verbose
   )
 
@@ -912,10 +947,10 @@ what_combo = function(model = NULL,
         if (model$normalise_by_pool) {
           for (g in groups) {
             # g=groups[1]
-            x = data$temp_var[data[, pool] == g]
+            x = data$temp_var[data[, model$pool_var] == g]
             assign('x',x,envir = e)
             x = f %>% run_text(env = e)
-            data$temp_var[data[, pool] == g] = x
+            data$temp_var[data[, model$pool_var] == g] = x
 
           }
         } else{
